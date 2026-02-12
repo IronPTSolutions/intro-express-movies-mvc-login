@@ -8,10 +8,6 @@ async function list(req, res) {
 async function detail(req, res) {
   const movie = await Movie.findById(req.params.id);
 
-  if (!movie) {
-    return res.status(404).json({ error: "movie not found" });
-  }
-
   res.json(movie);
 }
 
@@ -23,19 +19,11 @@ async function create(req, res) {
 async function update(req, res) {
   const movie = await Movie.findByIdAndUpdate(req.params.id, req.body);
 
-  if (!movie) {
-    return res.status(404).json({ error: "movie not found" });
-  }
-
   res.json(movie);
 }
 
 async function deleteMovie(req, res) {
   const movie = await Movie.findById(req.params.id);
-
-  if (!movie) {
-    return res.status(404).json({ error: "movie not found" });
-  }
 
   await Movie.delete(req.params.id);
   res.status(204).send();
