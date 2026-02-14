@@ -15,12 +15,13 @@ Tu misión es **añadir un sistema robusto de manejo de errores** siguiendo las 
 El proyecto ya tiene un CRUD funcional de películas con la siguiente estructura:
 
 ```
-app.js                        ← Servidor Express
-app.test.js                   ← Tests (tu guía para saber si vas bien)
-config/routes.config.js       ← Definición de rutas
+app.js                          ← Servidor Express
+app.test.js                     ← Tests (tu guía para saber si vas bien)
+config/routes.config.js         ← Definición de rutas
 controllers/movie.controller.js ← Lógica de cada endpoint
-models/movie.model.js         ← Modelo de datos
-docs/error-handling.md        ← 📖 Guía de referencia sobre manejo de errores
+models/movie.model.js           ← Modelo de datos
+middlewares/                    ← 📂 Aquí crearás el middleware de errores
+docs/error-handling.md          ← 📖 Guía de referencia sobre manejo de errores
 ```
 
 ### Endpoints existentes
@@ -108,38 +109,77 @@ Aplica el mismo patrón en `update` y `delete`.
 
 ---
 
-### Iteración 3: Middleware centralizado de manejo de errores
+### Iteración 3: Crear el middleware centralizado de manejo de errores
 
-Abre `app.js` y añade un **middleware de manejo de errores** después de las rutas. Este middleware debe:
+Crea el archivo `middlewares/error-handler.middleware.js`. Este middleware será el encargado de interceptar **todos** los errores de la aplicación y devolver respuestas HTTP apropiadas.
 
-1. Recibir **4 parámetros**: `(err, req, res, next)` — así es como Express reconoce que es un middleware de errores.
-2. Comprobar si el error tiene la propiedad `.status` (errores creados con `http-errors`) y responder con el código y mensaje correspondientes.
-3. Para cualquier otro error no controlado, responder con un **500** genérico.
+Debe exportar una función `errorHandler` con **4 parámetros** `(err, req, res, next)` — así es como Express reconoce que es un middleware de errores.
+
+El middleware debe gestionar los siguientes tipos de error, **en este orden**:
+
+#### 1. Error de validación de Mongoose (`ValidationError`)
+
+Cuando Mongoose detecta que faltan campos obligatorios o los datos no cumplen el esquema, lanza un error con `err.name === "ValidationError"`. Responde con **400 Bad Request** y devuelve directamente `err.errors` (el objeto con el detalle de cada campo que falló).
+
+#### 2. Error con status definido (`http-errors`)
+
+Los errores creados con `http-errors` (o similares) ya traen una propiedad `.status`. Responde con ese código de estado y un JSON con la clave `message`.
+
+#### 3. Error de cast de Mongoose (`CastError`)
+
+Cuando se recibe un ID con formato inválido (por ejemplo, un ObjectId mal formado), Mongoose lanza un error con `err.name === "CastError"`. Responde con **404 Not Found** y el mensaje `"Resource not found"`.
+
+#### 4. Error de clave duplicada en MongoDB (`E11000`)
+
+Cuando se intenta crear un recurso con un valor único que ya existe (por ejemplo, un ISBN duplicado), MongoDB lanza un error cuyo mensaje incluye `"E11000"`. Comprueba con `err.message?.includes("E11000")` y responde con **409 Conflict** y el mensaje `"Resource already exist"`.
+
+#### 5. Cualquier otro error
+
+Para cualquier error no contemplado, imprime el error en consola con `console.error(err)` y responde con **500 Internal Server Error** y el mensaje `"Internal server error"`.
 
 **Estructura esperada del middleware:**
 
 ```js
-app.use((err, req, res, next) => {
-  // 1. Si el error tiene .status (creado con http-errors)
-  //    → responder con ese status y su mensaje
-  // 2. Cualquier otro error
-  //    → responder con 500 y un mensaje genérico
-});
+export function errorHandler(err, req, res, next) {
+  // 1. ValidationError → 400 con err.errors
+  // 2. err.status      → responder con ese status y su mensaje
+  // 3. CastError       → 404 "Resource not found"
+  // 4. E11000          → 409 "Resource already exist"
+  // 5. Cualquier otro  → 500 "Internal server error"
+}
 ```
 
-> ⚠️ **Importante:** El middleware de errores debe ir **después** de `app.use(router)`, es decir, al final de la cadena de middlewares.
+> 💡 **Pista:** Usa `return` (o `return` implícito) después de cada `res.status().json()` para que no se ejecuten los bloques siguientes.
 
 El formato de la respuesta JSON debe ser:
 
 ```json
 {
-  "error": "Mensaje del error"
+  "message": "Mensaje del error"
 }
 ```
 
+> La excepción es `ValidationError`, que devuelve `err.errors` directamente.
+
 ---
 
-### Iteración 4: Ejecutar los tests
+### Iteración 4: Registrar el middleware en `app.js`
+
+Importa la función `errorHandler` desde `middlewares/error-handler.middleware.js` y regístrala en `app.js` **después** de las rutas:
+
+```js
+import { errorHandler } from "./middlewares/error-handler.middleware.js";
+
+// ... rutas ...
+
+app.use(errorHandler);
+```
+
+> ⚠️ **Importante:** El middleware de errores debe ir **después** de `app.use(router)`, es decir, al final de la cadena de middlewares.
+
+---
+
+### Iteración 5: Ejecutar los tests
 
 Ejecuta los tests para comprobar que todo funciona correctamente:
 
@@ -152,7 +192,8 @@ Todos los tests deberían pasar. Si alguno falla, revisa:
 - ¿Estás lanzando `createError(404, ...)` cuando la película no existe?
 - ¿El middleware de errores está **después** de las rutas en `app.js`?
 - ¿El middleware de errores tiene exactamente **4 parámetros**?
-- ¿La respuesta JSON tiene la clave `error` con el mensaje?
+- ¿La respuesta JSON tiene la clave `message` con el mensaje?
+- ¿Estás comprobando los tipos de error en el orden correcto?
 
 ---
 
@@ -176,10 +217,13 @@ Cuando hayas terminado:
 
 - `GET /movies` → 200 con array de películas.
 - `GET /movies/1` → 200 con la película.
-- `GET /movies/999` → **404** con `{ "error": "Movie not found" }`.
+- `GET /movies/999` → **404** con `{ "message": "Movie not found" }`.
 - `POST /movies` con body válido → 201 con la película creada.
-- `PATCH /movies/999` → **404** con `{ "error": "Movie not found" }`.
-- `DELETE /movies/999` → **404** con `{ "error": "Movie not found" }`.
-- Cualquier error inesperado → **500** con `{ "error": "Internal server error" }`.
+- `POST /movies` con datos inválidos → **400** con los errores de validación.
+- `POST /movies` con valor duplicado → **409** con `{ "message": "Resource already exist" }`.
+- `GET /movies/id-mal-formado` → **404** con `{ "message": "Resource not found" }`.
+- `PATCH /movies/999` → **404** con `{ "message": "Movie not found" }`.
+- `DELETE /movies/999` → **404** con `{ "message": "Movie not found" }`.
+- Cualquier error inesperado → **500** con `{ "message": "Internal server error" }`.
 
 Happy coding! 💙

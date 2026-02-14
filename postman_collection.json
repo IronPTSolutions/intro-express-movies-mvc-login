@@ -1,0 +1,211 @@
+{
+	"info": {
+		"name": "Movies API",
+		"description": "Colección de Postman para la API REST de películas construida con Express 5.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000"
+		},
+		{
+			"key": "movieId",
+			"value": "1"
+		}
+	],
+	"item": [
+		{
+			"name": "Movies",
+			"item": [
+				{
+					"name": "Listar todas las películas",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/movies",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies"]
+						}
+					}
+				},
+				{
+					"name": "Obtener una película por ID",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/movies/{{movieId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "{{movieId}}"]
+						}
+					}
+				},
+				{
+					"name": "Crear una nueva película",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/movies",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"title\": \"Inception\",\n\t\"year\": \"2010\",\n\t\"director\": \"Christopher Nolan\",\n\t\"duration\": \"2h 28min\",\n\t\"genre\": [\"Action\", \"Sci-Fi\", \"Thriller\"],\n\t\"rate\": \"8.8\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Actualizar una película",
+					"request": {
+						"method": "PATCH",
+						"url": {
+							"raw": "{{baseUrl}}/movies/{{movieId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "{{movieId}}"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"rate\": \"9.5\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Eliminar una película",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{baseUrl}}/movies/{{movieId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "{{movieId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Errores",
+			"item": [
+				{
+					"name": "404 - Película no encontrada (GET)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/movies/999",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "999"]
+						}
+					}
+				},
+				{
+					"name": "404 - Película no encontrada (PATCH)",
+					"request": {
+						"method": "PATCH",
+						"url": {
+							"raw": "{{baseUrl}}/movies/999",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "999"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"rate\": \"9.0\"\n}"
+						}
+					}
+				},
+				{
+					"name": "404 - Película no encontrada (DELETE)",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{baseUrl}}/movies/999",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "999"]
+						}
+					}
+				},
+				{
+					"name": "404 - CastError (ID mal formado)",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/movies/id-invalido",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "id-invalido"]
+						}
+					}
+				},
+				{
+					"name": "404 - Ruta no encontrada",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/ruta-inexistente",
+							"host": ["{{baseUrl}}"],
+							"path": ["ruta-inexistente"]
+						}
+					}
+				},
+				{
+					"name": "400 - ValidationError (body vacío)",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/movies",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{}"
+						}
+					}
+				},
+				{
+					"name": "409 - Recurso duplicado",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/movies",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"title\": \"The Shawshank Redemption\",\n\t\"year\": \"1994\",\n\t\"director\": \"Frank Darabont\",\n\t\"duration\": \"2h 22min\",\n\t\"genre\": [\"Crime\", \"Drama\"],\n\t\"rate\": \"9.3\"\n}"
+						}
+					}
+				}
+			]
+		}
+	]
+}
