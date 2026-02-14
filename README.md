@@ -61,6 +61,18 @@ Para lanzar el servidor en modo desarrollo:
 npm run dev
 ```
 
+### Colección Postman
+
+El proyecto incluye el archivo `postman_collection.json` con todas las peticiones de la API (movies y ratings) ya configuradas. Puedes importarlo en [Postman](https://www.postman.com/) para probar los endpoints manualmente mientras desarrollas:
+
+1. Abre Postman → **Import** → selecciona `postman_collection.json`.
+2. Crea una película con `POST /movies` y copia el `id` de la respuesta.
+3. Edita la variable `movieId` de la colección con ese valor.
+4. Usa las peticiones de la carpeta **Ratings** para probar tu implementación.
+5. Cuando crees un rating, copia su `id` y actualiza la variable `ratingId`.
+
+> 💡 Combina los tests (`npm test`) con Postman: los tests te dicen **qué falla**, Postman te ayuda a ver **las respuestas reales** y depurar.
+
 ---
 
 ### Iteración 1: Crear el modelo `Rating`

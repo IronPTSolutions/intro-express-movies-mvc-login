@@ -1,7 +1,7 @@
 {
 	"info": {
 		"name": "Movies API",
-		"description": "Colección de Postman para la API REST de películas construida con Express 5.",
+		"description": "Colección de Postman para la API REST de películas y valoraciones construida con Express 5.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -11,7 +11,11 @@
 		},
 		{
 			"key": "movieId",
-			"value": "1"
+			"value": "<REEMPLAZAR_CON_ID_REAL>"
+		},
+		{
+			"key": "ratingId",
+			"value": "<REEMPLAZAR_CON_ID_REAL>"
 		}
 	],
 	"item": [
@@ -30,7 +34,7 @@
 					}
 				},
 				{
-					"name": "Obtener una película por ID",
+					"name": "Obtener una película por ID (con ratings populados)",
 					"request": {
 						"method": "GET",
 						"url": {
@@ -96,27 +100,38 @@
 			]
 		},
 		{
-			"name": "Errores",
+			"name": "Ratings",
 			"item": [
 				{
-					"name": "404 - Película no encontrada (GET)",
+					"name": "Listar todas las valoraciones (con película populada)",
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{baseUrl}}/movies/999",
+							"raw": "{{baseUrl}}/ratings",
 							"host": ["{{baseUrl}}"],
-							"path": ["movies", "999"]
+							"path": ["ratings"]
 						}
 					}
 				},
 				{
-					"name": "404 - Película no encontrada (PATCH)",
+					"name": "Obtener una valoración por ID (con película populada)",
 					"request": {
-						"method": "PATCH",
+						"method": "GET",
 						"url": {
-							"raw": "{{baseUrl}}/movies/999",
+							"raw": "{{baseUrl}}/ratings/{{ratingId}}",
 							"host": ["{{baseUrl}}"],
-							"path": ["movies", "999"]
+							"path": ["ratings", "{{ratingId}}"]
+						}
+					}
+				},
+				{
+					"name": "Crear una valoración",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/ratings",
+							"host": ["{{baseUrl}}"],
+							"path": ["ratings"]
 						},
 						"header": [
 							{
@@ -126,18 +141,66 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\t\"rate\": \"9.0\"\n}"
+							"raw": "{\n\t\"movie\": \"{{movieId}}\",\n\t\"text\": \"Una película extraordinaria con un concepto brillante\",\n\t\"score\": 5\n}"
 						}
 					}
 				},
 				{
-					"name": "404 - Película no encontrada (DELETE)",
+					"name": "Actualizar una valoración",
+					"request": {
+						"method": "PATCH",
+						"url": {
+							"raw": "{{baseUrl}}/ratings/{{ratingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["ratings", "{{ratingId}}"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"score\": 4,\n\t\"text\": \"Buena película pero un poco larga para mi gusto\"\n}"
+						}
+					}
+				},
+				{
+					"name": "Eliminar una valoración",
 					"request": {
 						"method": "DELETE",
 						"url": {
-							"raw": "{{baseUrl}}/movies/999",
+							"raw": "{{baseUrl}}/ratings/{{ratingId}}",
 							"host": ["{{baseUrl}}"],
-							"path": ["movies", "999"]
+							"path": ["ratings", "{{ratingId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Errores",
+			"item": [
+				{
+					"name": "404 - Película no encontrada",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/movies/aaaaaaaaaaaaaaaaaaaaaaaa",
+							"host": ["{{baseUrl}}"],
+							"path": ["movies", "aaaaaaaaaaaaaaaaaaaaaaaa"]
+						}
+					}
+				},
+				{
+					"name": "404 - Rating no encontrado",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{baseUrl}}/ratings/aaaaaaaaaaaaaaaaaaaaaaaa",
+							"host": ["{{baseUrl}}"],
+							"path": ["ratings", "aaaaaaaaaaaaaaaaaaaaaaaa"]
 						}
 					}
 				},
@@ -164,7 +227,28 @@
 					}
 				},
 				{
-					"name": "400 - ValidationError (body vacío)",
+					"name": "404 - Crear rating con película inexistente",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/ratings",
+							"host": ["{{baseUrl}}"],
+							"path": ["ratings"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"movie\": \"aaaaaaaaaaaaaaaaaaaaaaaa\",\n\t\"text\": \"Esta review es para una película que no existe\",\n\t\"score\": 3\n}"
+						}
+					}
+				},
+				{
+					"name": "400 - ValidationError movie (body vacío)",
 					"request": {
 						"method": "POST",
 						"url": {
@@ -185,13 +269,13 @@
 					}
 				},
 				{
-					"name": "409 - Recurso duplicado",
+					"name": "400 - ValidationError rating (sin texto)",
 					"request": {
 						"method": "POST",
 						"url": {
-							"raw": "{{baseUrl}}/movies",
+							"raw": "{{baseUrl}}/ratings",
 							"host": ["{{baseUrl}}"],
-							"path": ["movies"]
+							"path": ["ratings"]
 						},
 						"header": [
 							{
@@ -201,7 +285,49 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n\t\"title\": \"The Shawshank Redemption\",\n\t\"year\": \"1994\",\n\t\"director\": \"Frank Darabont\",\n\t\"duration\": \"2h 22min\",\n\t\"genre\": [\"Crime\", \"Drama\"],\n\t\"rate\": \"9.3\"\n}"
+							"raw": "{\n\t\"movie\": \"{{movieId}}\",\n\t\"score\": 3\n}"
+						}
+					}
+				},
+				{
+					"name": "400 - ValidationError rating (texto demasiado corto)",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/ratings",
+							"host": ["{{baseUrl}}"],
+							"path": ["ratings"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"movie\": \"{{movieId}}\",\n\t\"text\": \"Corto\",\n\t\"score\": 3\n}"
+						}
+					}
+				},
+				{
+					"name": "400 - ValidationError rating (score fuera de rango)",
+					"request": {
+						"method": "POST",
+						"url": {
+							"raw": "{{baseUrl}}/ratings",
+							"host": ["{{baseUrl}}"],
+							"path": ["ratings"]
+						},
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"movie\": \"{{movieId}}\",\n\t\"text\": \"Esta review tiene un score fuera de rango\",\n\t\"score\": 10\n}"
 						}
 					}
 				}
