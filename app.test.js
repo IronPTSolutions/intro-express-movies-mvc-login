@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 import mongoose from "mongoose";
+import bcrypt from "bcrypt";
 import app from "./app.js";
 import Movie from "./models/movie.model.js";
+import User from "./models/user.model.js";
 
 let movie1, movie2;
 const fakeId = new mongoose.Types.ObjectId();
@@ -380,5 +382,228 @@ describe("Middleware de errores", () => {
     expect(res.status).toBe(404);
     expect(res.headers["content-type"]).toMatch(/json/);
     expect(res.body).toHaveProperty("error");
+  });
+});
+
+// =============================================
+// Iteración 1: Modelo User — Validaciones
+// =============================================
+
+const validUser = {
+  email: "test@example.com",
+  password: "secret123",
+  fullName: "Test User",
+  birthDate: "1990-01-15",
+};
+
+describe("Iteración 1: Modelo User — Validaciones", () => {
+  it("POST /api/users should return 400 when email is missing", async () => {
+    const { email, ...body } = validUser;
+    const res = await request(app).post("/api/users").send(body);
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/users should return 400 when email format is invalid", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .send({ ...validUser, email: "not-an-email" });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/users should return 400 when password is missing", async () => {
+    const { password, ...body } = validUser;
+    const res = await request(app).post("/api/users").send(body);
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/users should return 400 when password is too short", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .send({ ...validUser, email: "short@test.com", password: "1234" });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/users should return 400 when fullName is missing", async () => {
+    const { fullName, ...body } = validUser;
+    const res = await request(app).post("/api/users").send(body);
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/users should return 400 when birthDate is missing", async () => {
+    const { birthDate, ...body } = validUser;
+    const res = await request(app).post("/api/users").send(body);
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/users should return 400 when user is under 18", async () => {
+    const res = await request(app)
+      .post("/api/users")
+      .send({ ...validUser, email: "minor@test.com", birthDate: "2015-01-01" });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// =============================================
+// Iteración 3: CRUD de Users
+// =============================================
+
+describe("Iteración 3: CRUD de Users", () => {
+  let user1;
+
+  describe("POST /api/users", () => {
+    it("should create a user and return 201", async () => {
+      const res = await request(app).post("/api/users").send(validUser);
+
+      expect(res.status).toBe(201);
+      expect(res.body).toHaveProperty("id");
+      expect(res.body.email).toBe(validUser.email);
+      expect(res.body.fullName).toBe(validUser.fullName);
+
+      user1 = res.body;
+    });
+
+    it("should not return the password field in the response", async () => {
+      const res = await request(app).post("/api/users").send({
+        ...validUser,
+        email: "nopassword@test.com",
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body).not.toHaveProperty("password");
+    });
+
+    it("should store the password hashed in the database", async () => {
+      const dbUser = await User.findById(user1.id).select("+password");
+      expect(dbUser.password).not.toBe(validUser.password);
+      const match = await bcrypt.compare(validUser.password, dbUser.password);
+      expect(match).toBe(true);
+    });
+
+    it("should create a user without bio (optional field)", async () => {
+      const res = await request(app).post("/api/users").send({
+        ...validUser,
+        email: "nobio@test.com",
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body).toHaveProperty("id");
+    });
+
+    it("should return 409 when email already exists", async () => {
+      const res = await request(app).post("/api/users").send(validUser);
+
+      expect(res.status).toBe(409);
+    });
+  });
+
+  describe("GET /api/users", () => {
+    it("should return an array of users", async () => {
+      const res = await request(app).get("/api/users");
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThan(0);
+    });
+
+    it("each user should have id, email and fullName", async () => {
+      const res = await request(app).get("/api/users");
+
+      res.body.forEach((user) => {
+        expect(user).toHaveProperty("id");
+        expect(user).toHaveProperty("email");
+        expect(user).toHaveProperty("fullName");
+      });
+    });
+
+    it("should not return password in the list", async () => {
+      const res = await request(app).get("/api/users");
+
+      res.body.forEach((user) => {
+        expect(user).not.toHaveProperty("password");
+      });
+    });
+  });
+
+  describe("GET /api/users/:id", () => {
+    it("should return a single user by id", async () => {
+      const res = await request(app).get(`/api/users/${user1.id}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty("id", user1.id);
+      expect(res.body.email).toBe(validUser.email);
+    });
+
+    it("should not return password in the detail", async () => {
+      const res = await request(app).get(`/api/users/${user1.id}`);
+
+      expect(res.body).not.toHaveProperty("password");
+    });
+
+    it("should return 404 for a non-existent user", async () => {
+      const res = await request(app).get(`/api/users/${fakeId}`);
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("PATCH /api/users/:id", () => {
+    it("should update user fields partially", async () => {
+      const res = await request(app)
+        .patch(`/api/users/${user1.id}`)
+        .send({ bio: "Hello world" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.bio).toBe("Hello world");
+      expect(res.body).toHaveProperty("id", user1.id);
+    });
+
+    it("should re-hash the password when updated", async () => {
+      const newPassword = "newpassword123";
+      const res = await request(app)
+        .patch(`/api/users/${user1.id}`)
+        .send({ password: newPassword });
+
+      expect(res.status).toBe(200);
+      expect(res.body).not.toHaveProperty("password");
+
+      const dbUser = await User.findById(user1.id);
+      const match = await bcrypt.compare(newPassword, dbUser.password);
+      expect(match).toBe(true);
+    });
+
+    it("should return 404 for a non-existent user", async () => {
+      const res = await request(app)
+        .patch(`/api/users/${fakeId}`)
+        .send({ bio: "Updated" });
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("DELETE /api/users/:id", () => {
+    it("should delete a user and return 204", async () => {
+      // Create a user to delete
+      const createRes = await request(app).post("/api/users").send({
+        ...validUser,
+        email: "todelete@test.com",
+      });
+
+      const res = await request(app).delete(`/api/users/${createRes.body.id}`);
+
+      expect(res.status).toBe(204);
+    });
+
+    it("should return 404 for a non-existent user", async () => {
+      const res = await request(app).delete(`/api/users/${fakeId}`);
+
+      expect(res.status).toBe(404);
+    });
   });
 });
