@@ -33,6 +33,12 @@ const movieSchema = new Schema(
   },
 );
 
+movieSchema.virtual("ratings", {
+  ref: "Rating",
+  localField: "_id",
+  foreignField: "movie",
+});
+
 const Movie = model("Movie", movieSchema);
 
 export default Movie;

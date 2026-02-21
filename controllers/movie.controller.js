@@ -7,7 +7,7 @@ async function list(req, res) {
 }
 
 async function detail(req, res) {
-  const movie = await Movie.findById(req.params.id);
+  const movie = await Movie.findById(req.params.id).populate("ratings");
 
   if (!movie) {
     throw createError(404, "Movie not found");
