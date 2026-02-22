@@ -1,19 +1,23 @@
-# LAB | Express Movies — Register & encrypt password
+# LAB | Express Movies — Registro, Login y Autenticación
 
 ## Introducción
 
-Tienes una API REST de películas construida con **Express 5** y **Mongoose**. La API ya tiene un CRUD completo de películas, un sistema de valoraciones (ratings) y un sistema de manejo de errores.
+Tienes una API REST de películas construida con **Express 5** y **Mongoose**. La API ya tiene un CRUD completo de películas y un sistema de valoraciones (ratings).
 
-Tu misión es **añadir un sistema de usuarios con autenticación básica**, aprendiendo a usar **validaciones avanzadas**, **middleware pre-save** y **cifrado de contraseñas** con bcrypt.
+Tu misión es **añadir un sistema de autenticación completo** que incluya:
+
+1. **Registro de usuarios** con contraseña cifrada usando bcrypt.
+2. **Login** que verifique las credenciales y devuelva una cookie de sesión.
+3. **Middleware de autenticación** que proteja todas las rutas excepto el registro y el login.
 
 ## Requisitos
 
-- Tener [Node.js](https://nodejs.org/) instalado (v22 o superior).
-- Tener [MongoDB](https://www.mongodb.com/) corriendo en local.
+- [Node.js](https://nodejs.org/) v22 o superior.
+- [MongoDB](https://www.mongodb.com/) corriendo en local.
 
 ## Punto de partida
 
-El proyecto ya tiene un CRUD funcional de películas y valoraciones con la siguiente estructura:
+El proyecto ya tiene un CRUD funcional de películas y valoraciones:
 
 ```
 app.js                              ← Servidor Express
@@ -31,32 +35,15 @@ middlewares/
   error-handler.middleware.js        ← Middleware de errores
 ```
 
-### Endpoints existentes
-
-| Método   | Ruta           | Descripción                     |
-| -------- | -------------- | ------------------------------- |
-| `GET`    | `/movies`      | Listar todas las películas      |
-| `GET`    | `/movies/:id`  | Obtener una película por ID     |
-| `POST`   | `/movies`      | Crear una nueva película        |
-| `PATCH`  | `/movies/:id`  | Actualizar una película         |
-| `DELETE` | `/movies/:id`  | Eliminar una película           |
-| `GET`    | `/ratings`     | Listar todas las valoraciones   |
-| `GET`    | `/ratings/:id` | Obtener una valoración por ID   |
-| `POST`   | `/ratings`     | Crear una nueva valoración      |
-| `PATCH`  | `/ratings/:id` | Actualizar una valoración       |
-| `DELETE` | `/ratings/:id` | Eliminar una valoración         |
-
-## Instrucciones
-
-### Configuración inicial
+## Configuración inicial
 
 ```bash
 npm install
 ```
 
-### Ejecutar los tests
+## Ejecutar los tests
 
-Los tests son tu guía principal. Al principio, muchos tests fallarán porque los usuarios no están implementados. Tu objetivo es hacer que **todos los tests pasen**.
+Los tests son tu guía principal. Al principio muchos tests fallarán. Tu objetivo es hacer que **todos pasen**.
 
 ```bash
 npm test
@@ -70,91 +57,27 @@ npm run dev
 
 ---
 
+## Instrucciones
+
 ### Iteración 1: Crear el modelo `User`
 
 Crea el archivo `models/user.model.js` con el siguiente esquema:
 
-| Campo       | Tipo     | Validaciones                                                              |
-| ----------- | -------- | ------------------------------------------------------------------------- |
-| `email`     | `String` | Obligatorio. Único. Con `trim`. Regex: `/^\S+@\S+\.\S+$/`               |
-| `password`  | `String` | Obligatorio. Mínimo 5 caracteres.                                        |
-| `fullName`  | `String` | Obligatorio. Con `trim`.                                                 |
-| `bio`       | `String` | Opcional. Con `trim`.                                                    |
-| `birthDate` | `Date`   | Obligatorio. Validador custom: el usuario debe tener al menos 18 años.   |
+| Campo       | Tipo     | Validaciones                                                            |
+| ----------- | -------- | ----------------------------------------------------------------------- |
+| `email`     | `String` | Obligatorio. Único. Con `trim`. Regex: `/^\S+@\S+\.\S+$/`             |
+| `password`  | `String` | Obligatorio. Mínimo 5 caracteres.                                      |
+| `fullName`  | `String` | Obligatorio. Con `trim`.                                               |
+| `bio`       | `String` | Opcional. Con `trim`.                                                  |
+| `birthDate` | `Date`   | Obligatorio. Validador custom: el usuario debe tener al menos 18 años. |
 
 **Puntos clave:**
 
-1. Configura el esquema con `timestamps: true` para que Mongoose añada automáticamente los campos `createdAt` y `updatedAt`.
-2. Configura `toJSON` con `virtuals: true` y una función `transform` que elimine los campos `password` y `_id` de las respuestas JSON. Esto es importante por seguridad: **nunca debes enviar la contraseña al cliente**.
-3. El campo `email` debe tener `unique: true` para evitar registros duplicados.
-4. El validador de `birthDate` debe calcular la edad del usuario comparando su fecha de nacimiento con la fecha actual.
+1. Configura `timestamps: true` y `toJSON` con `virtuals: true` y una función `transform` que elimine `password` y `_id` de las respuestas JSON.
+2. Añade un middleware `pre("save")` que cifre la contraseña con `bcrypt.hash(password, 10)` **solo si el campo ha sido modificado** (`this.isModified("password")`).
+3. Añade un método de instancia `checkPassword(passwordToCheck)` que use `bcrypt.compare()` para comparar la contraseña en texto plano con el hash almacenado.
 
-**Pista:**
-
-```js
-import { Schema, model } from "mongoose";
-
-const userSchema = new Schema(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      match: /^\S+@\S+\.\S+$/,
-    },
-    // ... define password, fullName, bio y birthDate con sus validaciones
-    birthDate: {
-      type: Date,
-      required: true,
-      validate: {
-        validator: function (value) {
-          // Calcula la edad y devuelve true si es >= 18
-        },
-        message: "User must be at least 18 years old",
-      },
-    },
-  },
-  {
-    timestamps: true,
-    toJSON: {
-      virtuals: true,
-      transform: (doc, ret) => {
-        // Elimina password y _id del objeto JSON
-        delete ret.password;
-        delete ret._id;
-        return ret;
-      },
-    },
-  },
-);
-
-const User = model("User", userSchema);
-
-export default User;
-```
-
----
-
-### Iteración 2: Cifrado de contraseña con bcrypt
-
-Antes de guardar un usuario en la base de datos, necesitamos **cifrar su contraseña**. Nunca debemos almacenar contraseñas en texto plano.
-
-#### ¿Qué es bcrypt?
-
-**bcrypt** es una librería de hashing diseñada específicamente para contraseñas. A diferencia de algoritmos como MD5 o SHA, bcrypt es **intencionalmente lento** y añade un "salt" aleatorio a cada hash, haciendo que dos contraseñas iguales generen hashes diferentes.
-
-Primero, instala la dependencia:
-
-```bash
-npm install bcrypt
-```
-
-#### Middleware `pre("save")`
-
-Mongoose permite definir **middlewares** que se ejecutan antes o después de ciertas operaciones. El middleware `pre("save")` se ejecuta **antes de guardar** un documento en la base de datos.
-
-Añade el siguiente middleware a tu esquema de usuario, **antes** de crear el modelo:
+**Pista — Middleware pre-save y checkPassword:**
 
 ```js
 import bcrypt from "bcrypt";
@@ -164,72 +87,120 @@ userSchema.pre("save", async function () {
     this.password = await bcrypt.hash(this.password, 10);
   }
 });
+
+userSchema.methods.checkPassword = function (passwordToCheck) {
+  return bcrypt.compare(passwordToCheck, this.password);
+};
 ```
 
-#### ¿Por qué `this.isModified("password")`?
-
-El middleware `pre("save")` se ejecuta **cada vez** que se llama a `.save()`, no solo al crear un usuario. Si un usuario actualiza su bio, no queremos re-cifrar la contraseña (que ya está cifrada). `isModified("password")` devuelve `true` solo si el campo `password` ha sido modificado, evitando cifrar un hash que ya estaba cifrado.
-
-#### Implicación importante para el update
-
-Esto significa que **no puedes usar `findByIdAndUpdate()`** para actualizar usuarios, porque este método **no dispara** el middleware `pre("save")`. En su lugar, deberás:
-
-1. Buscar el usuario con `findById()`
-2. Asignar los nuevos valores con `Object.assign()`
-3. Guardar con `.save()` (esto sí dispara el `pre("save")`)
+> `isModified("password")` evita re-cifrar un hash que ya estaba cifrado cuando se actualizan otros campos.
 
 ---
 
-### Iteración 3: Crear el controlador CRUD de Users
+### Iteración 2: Registro de usuarios
 
-Crea el archivo `controllers/user.controller.js` con las siguientes funciones:
+Crea el controlador `controllers/user.controller.js` con las funciones CRUD:
 
+- **`create(req, res)`** — Crea un usuario con `User.create(req.body)`. Devuelve **201**.
 - **`list(req, res)`** — Devuelve todos los usuarios.
-- **`detail(req, res)`** — Devuelve un usuario por ID. Si no existe, lanza un error 404.
-- **`create(req, res)`** — Crea un nuevo usuario. Devuelve 201.
-- **`update(req, res)`** — Actualiza un usuario por ID. **Debe usar `findById` + `Object.assign` + `.save()`** para que el middleware `pre("save")` se ejecute y cifre la contraseña si fue modificada. Si no existe, lanza un error 404.
-- **`delete(req, res)`** — Elimina un usuario por ID. Si no existe, lanza un error 404. Devuelve 204.
+- **`detail(req, res)`** — Devuelve un usuario por ID. Lanza error 404 si no existe.
+- **`update(req, res)`** — **Debe usar `findById` + `Object.assign` + `.save()`** (no `findByIdAndUpdate`) para que el middleware pre-save cifre la contraseña si fue modificada.
+- **`delete(req, res)`** — Elimina un usuario. Devuelve **204**.
 
-**Pista — La función `update` debe seguir este patrón:**
-
-```js
-async function update(req, res) {
-  const user = await User.findById(req.params.id);
-
-  if (!user) {
-    throw createError(404, "User not found");
-  }
-
-  Object.assign(user, req.body);
-  await user.save();
-
-  res.json(user);
-}
-```
-
-> 💡 **¿Por qué `Object.assign`?** Este método copia las propiedades de `req.body` al documento `user` existente. Así, solo se modifican los campos que envía el cliente. Después, `.save()` dispara el middleware `pre("save")` que cifrará la contraseña si fue modificada.
-
----
-
-### Iteración 4: Añadir las rutas
-
-Abre `config/routes.config.js` y añade las rutas para el CRUD de usuarios:
+Añade las rutas en `config/routes.config.js`:
 
 | Método   | Ruta              | Controlador            |
 | -------- | ----------------- | ---------------------- |
+| `POST`   | `/api/users`      | `userController.create` |
 | `GET`    | `/api/users`      | `userController.list`   |
 | `GET`    | `/api/users/:id`  | `userController.detail` |
-| `POST`   | `/api/users`      | `userController.create` |
 | `PATCH`  | `/api/users/:id`  | `userController.update` |
 | `DELETE` | `/api/users/:id`  | `userController.delete` |
 
-Recuerda importar el controlador al principio del archivo.
+---
+
+### Iteración 3: Modelo `Session`
+
+Crea el archivo `models/session.model.js`. Una sesión representa una conexión activa de un usuario:
+
+| Campo  | Tipo         | Descripción                                        |
+| ------ | ------------ | -------------------------------------------------- |
+| `user` | `ObjectId`   | Referencia al modelo `User` (con `ref: "User"`).   |
+
+Configura el esquema con `timestamps: true` y `toJSON` con `virtuals: true` (elimina `_id` en el transform).
 
 ---
 
-### Iteración 5: Ejecutar los tests
+### Iteración 4: Endpoint de Login
 
-Ejecuta los tests para comprobar que todo funciona correctamente:
+Añade la función `login` al controlador de usuarios y la ruta `POST /api/users/login`.
+
+El login debe:
+
+1. Validar que se envían `email` y `password`. Si falta alguno, lanzar error **400**.
+2. Buscar el usuario por email. Si no existe, lanzar error **401**.
+3. Verificar la contraseña con `user.checkPassword(password)`. Si no coincide, lanzar error **401**.
+4. Crear una sesión (`Session.create({ user: user._id })`).
+5. Establecer una cookie `sessionId` con el `_id` de la sesión:
+
+```js
+res.cookie("sessionId", session._id.toString(), {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+});
+res.end();
+```
+
+> `httpOnly: true` impide que JavaScript del navegador acceda a la cookie. Esto protege contra ataques XSS.
+
+---
+
+### Iteración 5: Middleware de autenticación
+
+Crea `middlewares/auth.middleware.js` con una función `checkAuth` que:
+
+1. **Permita sin autenticación** las peticiones `POST /api/users` (registro) y `POST /api/users/login`.
+2. Extraiga el `sessionId` de la cookie de la petición.
+3. Busque la sesión en la base de datos y popule el campo `user`.
+4. Si no hay cookie o la sesión no existe, lance error **401**.
+5. Adjunte la sesión a `req.session` para que los controladores puedan acceder al usuario autenticado.
+
+**Pista para extraer la cookie:**
+
+```js
+const sessionId = req.headers.cookie?.match(/sessionId=([^;]+)/)?.[1];
+```
+
+**Registra el middleware en `app.js`** antes del router:
+
+```js
+import { checkAuth } from "./middlewares/auth.middleware.js";
+
+app.use(checkAuth);
+app.use(router);
+```
+
+---
+
+### Iteración 6: Profile y Logout
+
+Añade dos endpoints más al controlador de usuarios:
+
+**`GET /api/users/profile`** — Devuelve el usuario autenticado:
+
+```js
+res.json(req.session.user);
+```
+
+**`DELETE /api/users/logout`** — Cierra la sesión actual eliminándola de la base de datos y devuelve **204**.
+
+Añade las rutas correspondientes en `routes.config.js`.
+
+> Las rutas `/api/users/profile` y `/api/users/logout` deben ir **antes** de `/api/users/:id` para que Express no interprete "profile" o "logout" como un `:id`.
+
+---
+
+## Ejecutar los tests
 
 ```bash
 npm test
@@ -237,59 +208,30 @@ npm test
 
 Todos los tests deberían pasar. Si alguno falla, revisa:
 
-- ¿El modelo `User` tiene todas las validaciones (`required`, `unique`, `match`, `minlength`)?
-- ¿Has configurado `toJSON` con `transform` para ocultar `password` y `_id`?
-- ¿Has añadido el middleware `pre("save")` con `bcrypt`?
-- ¿El controlador `update` usa `findById` + `Object.assign` + `.save()` en lugar de `findByIdAndUpdate`?
-- ¿Has registrado las rutas en `routes.config.js` con el prefijo `/api/users`?
-- ¿El validador de `birthDate` calcula correctamente si el usuario tiene al menos 18 años?
+- ¿El modelo `User` tiene todas las validaciones y el método `checkPassword`?
+- ¿Has cifrado la contraseña con el middleware `pre("save")`?
+- ¿El login verifica credenciales y establece la cookie `sessionId`?
+- ¿El middleware `checkAuth` permite registro y login sin autenticación?
+- ¿El middleware `checkAuth` adjunta `req.session` con el usuario populado?
+- ¿Las rutas de profile y logout están antes de `:id`?
 
 ---
 
 ## Resultado esperado
 
-Cuando hayas terminado:
+**Registro:**
+- `POST /api/users` → **201** con el usuario creado (sin password en la respuesta). La contraseña se almacena cifrada en la BD.
 
-**Users CRUD:**
+**Login:**
+- `POST /api/users/login` con credenciales válidas → **200** con cookie `sessionId`.
+- `POST /api/users/login` con credenciales inválidas → **401**.
 
-- `POST /api/users` con body válido → 201 con el usuario creado (sin password en la respuesta).
-- `POST /api/users` con datos inválidos → 400.
-- `POST /api/users` con email duplicado → 409.
-- `GET /api/users` → 200 con array de usuarios (sin password).
-- `GET /api/users/:id` → 200 con el usuario (sin password).
-- `PATCH /api/users/:id` → 200 con el usuario actualizado (sin password).
-- `PATCH /api/users/:id` con nueva password → La contraseña se re-cifra en la BD.
-- `DELETE /api/users/:id` → 204.
+**Autenticación:**
+- Cualquier ruta (excepto registro y login) sin cookie → **401**.
+- Cualquier ruta con cookie válida → funciona normalmente.
 
-**Ejemplo de respuesta `POST /api/users`:**
+**Profile y Logout:**
+- `GET /api/users/profile` → **200** con datos del usuario autenticado.
+- `DELETE /api/users/logout` → **204**. La cookie deja de ser válida.
 
-```json
-{
-  "id": "abc123",
-  "email": "ana@example.com",
-  "fullName": "Ana García",
-  "bio": "Desarrolladora full-stack",
-  "birthDate": "1995-03-15T00:00:00.000Z",
-  "createdAt": "2026-02-21T10:30:00.000Z",
-  "updatedAt": "2026-02-21T10:30:00.000Z"
-}
-```
-
-> Nota: el campo `password` **no aparece** en la respuesta gracias a la función `transform` del esquema.
-
-**Ejemplo de respuesta `GET /api/users`:**
-
-```json
-[
-  {
-    "id": "abc123",
-    "email": "ana@example.com",
-    "fullName": "Ana García",
-    "birthDate": "1995-03-15T00:00:00.000Z",
-    "createdAt": "2026-02-21T10:30:00.000Z",
-    "updatedAt": "2026-02-21T10:30:00.000Z"
-  }
-]
-```
-
-Happy coding! 💙
+Happy coding!
